@@ -79,6 +79,114 @@
         event.preventDefault();
       });
       var initialize = async() =>{
+	       try {
+      // Extract the 'path' query parameter from the URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const dynamicPath = urlParams.get('path') || 'immarsifyproduct/immarsifyAR'; // Fallback to default if not provided
+      console.log("Using dynamic path:", dynamicPath);
+
+      console.log("Starting API fetch...");
+      const apiUrl = `https://sandboxapi.immarsify.com/api/ar/ar_view/${dynamicPath}`;
+      console.log("Fetching from:", apiUrl);
+      const response = await fetch(apiUrl);
+      console.log("Response status:", response.status);
+      if (!response.ok) {
+        // throw new Error(`Network response was not ok: ${response.status}`);
+      }
+      const responseData = await response.json();
+      console.log("API response received:", responseData);
+      if (responseData?.code !== 200) {
+        return ShowDisplayError(responseData?.message || "Error while fetching card");
+      }
+
+      // Handle branding data
+      if (responseData?.data?.branding) {
+        const brandingData = responseData.data.branding;
+
+        // Handle Custom Welcome Screen
+        const welcomeScreen = brandingData.find(item => item.name === "Custom Welcome Screen");
+        const startARDiv = document.querySelector("#startARDiv");
+
+        if (welcomeScreen && welcomeScreen.enabled) {
+          if (startARDiv) {
+            startARDiv.style.backgroundImage = `url('${welcomeScreen.url}')`;
+            startARDiv.style.backgroundSize = 'cover';
+            startARDiv.style.backgroundPosition = 'center';
+          }
+        } else {
+          if (startARDiv) {
+            startARDiv.style.backgroundImage = `url('/TemplateData/immarsify_bg.svg')`;
+            startARDiv.style.backgroundSize = 'cover';
+            startARDiv.style.backgroundPosition = 'center';
+          }
+        }
+
+        // Handle Loading Screen
+        const loadingScreen = brandingData.find(item => item.name === "Loading Screen");
+        const unityLogo = document.querySelector("#unity-logo");
+        if (loadingScreen && loadingScreen.enabled) {
+          if (unityLogo) {
+            unityLogo.style.backgroundImage = `url('${loadingScreen.url}')`;
+            unityLogo.style.backgroundRepeat = 'no-repeat';
+            unityLogo.style.backgroundPosition = 'center';
+            unityLogo.style.backgroundSize = 'contain';
+          }
+        } else {
+          if (unityLogo) {
+            unityLogo.style.backgroundImage = `url('/TemplateData/splash.gif')`;
+            unityLogo.style.backgroundRepeat = 'no-repeat';
+            unityLogo.style.backgroundPosition = 'center';
+            unityLogo.style.backgroundSize = 'contain';
+            unityLogo.style.width = '420px';
+          }
+        }
+      }
+
+      // Extract the target image URL
+      const imageUrl = responseData?.data?.arExperience?.targetImage?.src;
+      console.log("Target image URL:", imageUrl);
+      if (imageUrl) {
+        const reelTarget = document.getElementById('reel');
+        if (reelTarget) {
+          reelTarget.setAttribute('src', imageUrl);
+          console.log("Updated 'reel' target with new URL:", imageUrl);
+        } else {
+          console.error("No element with id 'reel' found.");
+        }
+      } else {
+        console.error("No target image URL found in API response");
+      }
+
+      function updateMetaTags(data) {
+        const metaTitle = responseData?.data?.arExperience?.name || "Grow your business with immarsify";
+        const vcardData = responseData?.data?.arExperience?.icons?.filter(icon => icon?.isvCard === true);
+        let metaDescription = "Grow your business with immarsify";
+
+        if (vcardData?.length > 0) {
+          metaDescription = vcardData[0]?.vCardJson?.note || metaDescription;
+        }
+
+        let metaImage = responseData?.data?.userDetail?.image || responseData?.data?.arExperience?.targetImage?.src;
+
+        if (!metaImage.startsWith('http')) {
+          metaImage = window.location.origin + metaImage;
+        }
+
+        document.title = metaTitle;
+        document.querySelector('meta[name="description"]').content = metaDescription;
+        document.querySelector('meta[property="og:title"]').content = metaTitle;
+        document.querySelector('#dyanamic-title').content = metaTitle;
+        document.querySelector('meta[property="og:description"]').content = metaDescription;
+        document.querySelector('meta[property="og:image"]').content = metaImage;
+        document.querySelector('meta[name="twitter:title"]').content = metaTitle;
+        document.querySelector('meta[name="twitter:description"]').content = metaDescription;
+        document.querySelector('meta[name="twitter:image"]').content = metaImage;
+      }
+
+      // updateMetaTags(responseData);
+    } catch (error) {
+      console.error('Error fetching or using image URL from API:', error);
+    }
         var unityCanvas = document.querySelector("#unity-canvas");
         var videoCanvas = document.querySelector("#video-canvas");
         window.arCamera = new ARCamera(unityCanvas, videoCanvas);
@@ -171,6 +279,16 @@
             loadingBar.style.display = "none";
             
             window.unityInstance = unityInstance;
+		const urlParams = new URLSearchParams(window.location.search);
+const dynamicPath = urlParams.get('path');
+
+// Check if path exists, then send it to Unity
+if (dynamicPath) {
+    unityInstance.SendMessage('GameController', 'apiData', dynamicPath);
+    unityInstance.SendMessage('GameController', 'loadARContent');
+} else {
+    console.warn('No "path" parameter found in the URL.');
+}  
             if(window.permissionsGranted) {
               RequestWebcam();
             }
